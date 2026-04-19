@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "subscriptions_stripe_customer_id_unique" ON "subscriptions" USING btree ("stripe_customer_id") WHERE "subscriptions"."stripe_customer_id" IS NOT NULL;

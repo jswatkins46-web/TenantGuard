@@ -5,269 +5,1104 @@
  * TenantShield API specification
  * OpenAPI spec version: 0.1.0
  */
-import * as zod from "zod";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import type {
+  MutationFunction,
+  QueryFunction,
+  QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult,
+} from "@tanstack/react-query";
+
+import type {
+  Case,
+  CreateCaseBody,
+  DashboardSummary,
+  ErrorResponse,
+  GenerateLetterBody,
+  HealthStatus,
+  Letter,
+  ListCasesParams,
+  UpdateCaseBody,
+} from "./api.schemas";
+
+import { customFetch } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
+
+type AwaitedInput<T> = PromiseLike<T> | T;
+
+type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Returns server health status
  * @summary Health check
  */
-export const HealthCheckResponse = zod.object({
-  status: zod.string(),
-});
+export const getHealthCheckUrl = () => {
+  return `/api/healthz`;
+};
+
+export const healthCheck = async (
+  options?: RequestInit,
+): Promise<HealthStatus> => {
+  return customFetch<HealthStatus>(getHealthCheckUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getHealthCheckQueryKey = () => {
+  return [`/api/healthz`] as const;
+};
+
+export const getHealthCheckQueryOptions = <
+  TData = Awaited<ReturnType<typeof healthCheck>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getHealthCheckQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({
+    signal,
+  }) => healthCheck({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type HealthCheckQueryResult = NonNullable<
+  Awaited<ReturnType<typeof healthCheck>>
+>;
+export type HealthCheckQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Health check
+ */
+
+export function useHealthCheck<
+  TData = Awaited<ReturnType<typeof healthCheck>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List all tenant cases
  */
-export const ListCasesQueryParams = zod.object({
-  status: zod.enum(["open", "in_progress", "resolved"]).optional(),
-  category: zod
-    .enum(["repairs", "deposit", "eviction", "noise", "harassment", "other"])
-    .optional(),
-});
+export const getListCasesUrl = (params?: ListCasesParams) => {
+  const normalizedParams = new URLSearchParams();
 
-export const ListCasesResponseItem = zod.object({
-  id: zod.number(),
-  title: zod.string(),
-  description: zod.string(),
-  state: zod.string(),
-  status: zod.enum(["open", "in_progress", "resolved"]),
-  category: zod.enum([
-    "repairs",
-    "deposit",
-    "eviction",
-    "noise",
-    "harassment",
-    "other",
-  ]),
-  landlordName: zod.string().nullable(),
-  landlordEmail: zod.string().nullable(),
-  landlordAddress: zod.string().nullable(),
-  propertyAddress: zod.string(),
-  letterCount: zod.number(),
-  createdAt: zod.coerce.date(),
-  updatedAt: zod.coerce.date(),
-});
-export const ListCasesResponse = zod.array(ListCasesResponseItem);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/cases?${stringifiedParams}`
+    : `/api/cases`;
+};
+
+export const listCases = async (
+  params?: ListCasesParams,
+  options?: RequestInit,
+): Promise<Case[]> => {
+  return customFetch<Case[]>(getListCasesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCasesQueryKey = (params?: ListCasesParams) => {
+  return [`/api/cases`, ...(params ? [params] : [])] as const;
+};
+
+export const getListCasesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCases>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListCasesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCases>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCasesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCases>>> = ({
+    signal,
+  }) => listCases(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCases>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCasesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCases>>
+>;
+export type ListCasesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all tenant cases
+ */
+
+export function useListCases<
+  TData = Awaited<ReturnType<typeof listCases>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListCasesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCases>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCasesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Create a new tenant case
  */
-export const CreateCaseBody = zod.object({
-  title: zod.string(),
-  description: zod.string(),
-  state: zod.string(),
-  category: zod.enum([
-    "repairs",
-    "deposit",
-    "eviction",
-    "noise",
-    "harassment",
-    "other",
-  ]),
-  landlordName: zod.string().optional(),
-  landlordEmail: zod.string().optional(),
-  landlordAddress: zod.string().optional(),
-  propertyAddress: zod.string(),
-});
+export const getCreateCaseUrl = () => {
+  return `/api/cases`;
+};
+
+export const createCase = async (
+  createCaseBody: CreateCaseBody,
+  options?: RequestInit,
+): Promise<Case> => {
+  return customFetch<Case>(getCreateCaseUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createCaseBody),
+  });
+};
+
+export const getCreateCaseMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCase>>,
+    TError,
+    { data: BodyType<CreateCaseBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCase>>,
+  TError,
+  { data: BodyType<CreateCaseBody> },
+  TContext
+> => {
+  const mutationKey = ["createCase"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCase>>,
+    { data: BodyType<CreateCaseBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCase(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCaseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCase>>
+>;
+export type CreateCaseMutationBody = BodyType<CreateCaseBody>;
+export type CreateCaseMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create a new tenant case
+ */
+export const useCreateCase = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCase>>,
+    TError,
+    { data: BodyType<CreateCaseBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCase>>,
+  TError,
+  { data: BodyType<CreateCaseBody> },
+  TContext
+> => {
+  return useMutation(getCreateCaseMutationOptions(options));
+};
 
 /**
  * @summary Get recently updated cases
  */
-export const GetRecentCasesResponseItem = zod.object({
-  id: zod.number(),
-  title: zod.string(),
-  description: zod.string(),
-  state: zod.string(),
-  status: zod.enum(["open", "in_progress", "resolved"]),
-  category: zod.enum([
-    "repairs",
-    "deposit",
-    "eviction",
-    "noise",
-    "harassment",
-    "other",
-  ]),
-  landlordName: zod.string().nullable(),
-  landlordEmail: zod.string().nullable(),
-  landlordAddress: zod.string().nullable(),
-  propertyAddress: zod.string(),
-  letterCount: zod.number(),
-  createdAt: zod.coerce.date(),
-  updatedAt: zod.coerce.date(),
-});
-export const GetRecentCasesResponse = zod.array(GetRecentCasesResponseItem);
+export const getGetRecentCasesUrl = () => {
+  return `/api/cases/recent`;
+};
+
+export const getRecentCases = async (
+  options?: RequestInit,
+): Promise<Case[]> => {
+  return customFetch<Case[]>(getGetRecentCasesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRecentCasesQueryKey = () => {
+  return [`/api/cases/recent`] as const;
+};
+
+export const getGetRecentCasesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRecentCases>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRecentCases>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRecentCasesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecentCases>>> = ({
+    signal,
+  }) => getRecentCases({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRecentCases>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRecentCasesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRecentCases>>
+>;
+export type GetRecentCasesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get recently updated cases
+ */
+
+export function useGetRecentCases<
+  TData = Awaited<ReturnType<typeof getRecentCases>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRecentCases>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRecentCasesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get a specific case
  */
-export const GetCaseParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const getGetCaseUrl = (id: number) => {
+  return `/api/cases/${id}`;
+};
 
-export const GetCaseResponse = zod.object({
-  id: zod.number(),
-  title: zod.string(),
-  description: zod.string(),
-  state: zod.string(),
-  status: zod.enum(["open", "in_progress", "resolved"]),
-  category: zod.enum([
-    "repairs",
-    "deposit",
-    "eviction",
-    "noise",
-    "harassment",
-    "other",
-  ]),
-  landlordName: zod.string().nullable(),
-  landlordEmail: zod.string().nullable(),
-  landlordAddress: zod.string().nullable(),
-  propertyAddress: zod.string(),
-  letterCount: zod.number(),
-  createdAt: zod.coerce.date(),
-  updatedAt: zod.coerce.date(),
-});
+export const getCase = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Case> => {
+  return customFetch<Case>(getGetCaseUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCaseQueryKey = (id: number) => {
+  return [`/api/cases/${id}`] as const;
+};
+
+export const getGetCaseQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCase>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getCase>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCaseQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCase>>> = ({
+    signal,
+  }) => getCase(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getCase>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetCaseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCase>>
+>;
+export type GetCaseQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get a specific case
+ */
+
+export function useGetCase<
+  TData = Awaited<ReturnType<typeof getCase>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getCase>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCaseQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Update a case
  */
-export const UpdateCaseParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const getUpdateCaseUrl = (id: number) => {
+  return `/api/cases/${id}`;
+};
 
-export const UpdateCaseBody = zod.object({
-  title: zod.string().optional(),
-  description: zod.string().optional(),
-  state: zod.string().optional(),
-  status: zod.enum(["open", "in_progress", "resolved"]).optional(),
-  category: zod
-    .enum(["repairs", "deposit", "eviction", "noise", "harassment", "other"])
-    .optional(),
-  landlordName: zod.string().optional(),
-  landlordEmail: zod.string().optional(),
-  landlordAddress: zod.string().optional(),
-  propertyAddress: zod.string().optional(),
-});
+export const updateCase = async (
+  id: number,
+  updateCaseBody: UpdateCaseBody,
+  options?: RequestInit,
+): Promise<Case> => {
+  return customFetch<Case>(getUpdateCaseUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateCaseBody),
+  });
+};
 
-export const UpdateCaseResponse = zod.object({
-  id: zod.number(),
-  title: zod.string(),
-  description: zod.string(),
-  state: zod.string(),
-  status: zod.enum(["open", "in_progress", "resolved"]),
-  category: zod.enum([
-    "repairs",
-    "deposit",
-    "eviction",
-    "noise",
-    "harassment",
-    "other",
-  ]),
-  landlordName: zod.string().nullable(),
-  landlordEmail: zod.string().nullable(),
-  landlordAddress: zod.string().nullable(),
-  propertyAddress: zod.string(),
-  letterCount: zod.number(),
-  createdAt: zod.coerce.date(),
-  updatedAt: zod.coerce.date(),
-});
+export const getUpdateCaseMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCase>>,
+    TError,
+    { id: number; data: BodyType<UpdateCaseBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCase>>,
+  TError,
+  { id: number; data: BodyType<UpdateCaseBody> },
+  TContext
+> => {
+  const mutationKey = ["updateCase"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCase>>,
+    { id: number; data: BodyType<UpdateCaseBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateCase(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCaseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCase>>
+>;
+export type UpdateCaseMutationBody = BodyType<UpdateCaseBody>;
+export type UpdateCaseMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Update a case
+ */
+export const useUpdateCase = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCase>>,
+    TError,
+    { id: number; data: BodyType<UpdateCaseBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCase>>,
+  TError,
+  { id: number; data: BodyType<UpdateCaseBody> },
+  TContext
+> => {
+  return useMutation(getUpdateCaseMutationOptions(options));
+};
 
 /**
  * @summary Delete a case
  */
-export const DeleteCaseParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const getDeleteCaseUrl = (id: number) => {
+  return `/api/cases/${id}`;
+};
+
+export const deleteCase = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteCaseUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteCaseMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCase>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteCase>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteCase"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteCase>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteCase(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteCaseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteCase>>
+>;
+
+export type DeleteCaseMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Delete a case
+ */
+export const useDeleteCase = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCase>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCase>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteCaseMutationOptions(options));
+};
 
 /**
  * @summary List letters for a specific case
  */
-export const ListLettersByCaseParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const getListLettersByCaseUrl = (id: number) => {
+  return `/api/cases/${id}/letters`;
+};
 
-export const ListLettersByCaseResponseItem = zod.object({
-  id: zod.number(),
-  caseId: zod.number(),
-  content: zod.string(),
-  letterType: zod.enum(["demand", "notice", "complaint", "appeal"]),
-  tone: zod.enum(["formal", "firm", "urgent"]),
-  createdAt: zod.coerce.date(),
-});
-export const ListLettersByCaseResponse = zod.array(
-  ListLettersByCaseResponseItem,
-);
+export const listLettersByCase = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Letter[]> => {
+  return customFetch<Letter[]>(getListLettersByCaseUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLettersByCaseQueryKey = (id: number) => {
+  return [`/api/cases/${id}/letters`] as const;
+};
+
+export const getListLettersByCaseQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLettersByCase>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLettersByCase>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListLettersByCaseQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listLettersByCase>>
+  > = ({ signal }) => listLettersByCase(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLettersByCase>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLettersByCaseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLettersByCase>>
+>;
+export type ListLettersByCaseQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List letters for a specific case
+ */
+
+export function useListLettersByCase<
+  TData = Awaited<ReturnType<typeof listLettersByCase>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listLettersByCase>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLettersByCaseQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Generate a demand letter for a case
  */
-export const GenerateLetterParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const getGenerateLetterUrl = (id: number) => {
+  return `/api/cases/${id}/letters`;
+};
 
-export const GenerateLetterBody = zod.object({
-  letterType: zod.enum(["demand", "notice", "complaint", "appeal"]),
-  tone: zod.enum(["formal", "firm", "urgent"]),
-  additionalContext: zod.string().optional(),
-});
+export const generateLetter = async (
+  id: number,
+  generateLetterBody: GenerateLetterBody,
+  options?: RequestInit,
+): Promise<Letter> => {
+  return customFetch<Letter>(getGenerateLetterUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generateLetterBody),
+  });
+};
+
+export const getGenerateLetterMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateLetter>>,
+    TError,
+    { id: number; data: BodyType<GenerateLetterBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateLetter>>,
+  TError,
+  { id: number; data: BodyType<GenerateLetterBody> },
+  TContext
+> => {
+  const mutationKey = ["generateLetter"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateLetter>>,
+    { id: number; data: BodyType<GenerateLetterBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return generateLetter(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateLetterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateLetter>>
+>;
+export type GenerateLetterMutationBody = BodyType<GenerateLetterBody>;
+export type GenerateLetterMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Generate a demand letter for a case
+ */
+export const useGenerateLetter = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateLetter>>,
+    TError,
+    { id: number; data: BodyType<GenerateLetterBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateLetter>>,
+  TError,
+  { id: number; data: BodyType<GenerateLetterBody> },
+  TContext
+> => {
+  return useMutation(getGenerateLetterMutationOptions(options));
+};
 
 /**
  * @summary List all generated letters
  */
-export const ListLettersResponseItem = zod.object({
-  id: zod.number(),
-  caseId: zod.number(),
-  content: zod.string(),
-  letterType: zod.enum(["demand", "notice", "complaint", "appeal"]),
-  tone: zod.enum(["formal", "firm", "urgent"]),
-  createdAt: zod.coerce.date(),
-});
-export const ListLettersResponse = zod.array(ListLettersResponseItem);
+export const getListLettersUrl = () => {
+  return `/api/letters`;
+};
+
+export const listLetters = async (options?: RequestInit): Promise<Letter[]> => {
+  return customFetch<Letter[]>(getListLettersUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLettersQueryKey = () => {
+  return [`/api/letters`] as const;
+};
+
+export const getListLettersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLetters>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listLetters>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListLettersQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listLetters>>> = ({
+    signal,
+  }) => listLetters({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLetters>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLettersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLetters>>
+>;
+export type ListLettersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all generated letters
+ */
+
+export function useListLetters<
+  TData = Awaited<ReturnType<typeof listLetters>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listLetters>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLettersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get a specific letter
  */
-export const GetLetterParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const getGetLetterUrl = (id: number) => {
+  return `/api/letters/${id}`;
+};
 
-export const GetLetterResponse = zod.object({
-  id: zod.number(),
-  caseId: zod.number(),
-  content: zod.string(),
-  letterType: zod.enum(["demand", "notice", "complaint", "appeal"]),
-  tone: zod.enum(["formal", "firm", "urgent"]),
-  createdAt: zod.coerce.date(),
-});
+export const getLetter = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Letter> => {
+  return customFetch<Letter>(getGetLetterUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLetterQueryKey = (id: number) => {
+  return [`/api/letters/${id}`] as const;
+};
+
+export const getGetLetterQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLetter>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLetter>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLetterQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLetter>>> = ({
+    signal,
+  }) => getLetter(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getLetter>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetLetterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLetter>>
+>;
+export type GetLetterQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get a specific letter
+ */
+
+export function useGetLetter<
+  TData = Awaited<ReturnType<typeof getLetter>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLetter>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLetterQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Delete a letter
  */
-export const DeleteLetterParams = zod.object({
-  id: zod.coerce.number(),
-});
+export const getDeleteLetterUrl = (id: number) => {
+  return `/api/letters/${id}`;
+};
+
+export const deleteLetter = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteLetterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteLetterMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLetter>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLetter>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteLetter"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLetter>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteLetter(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteLetterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteLetter>>
+>;
+
+export type DeleteLetterMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Delete a letter
+ */
+export const useDeleteLetter = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLetter>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteLetter>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteLetterMutationOptions(options));
+};
 
 /**
  * @summary Get dashboard summary statistics
  */
-export const GetDashboardSummaryResponse = zod.object({
-  totalCases: zod.number(),
-  openCases: zod.number(),
-  inProgressCases: zod.number(),
-  resolvedCases: zod.number(),
-  totalLetters: zod.number(),
-  casesByCategory: zod.array(
-    zod.object({
-      category: zod.string(),
-      count: zod.number(),
-    }),
-  ),
-  recentActivity: zod.array(
-    zod.object({
-      type: zod.enum(["case_created", "case_updated", "letter_generated"]),
-      description: zod.string(),
-      caseId: zod.number(),
-      caseTitle: zod.string(),
-      createdAt: zod.coerce.date(),
-    }),
-  ),
-});
+export const getGetDashboardSummaryUrl = () => {
+  return `/api/dashboard/summary`;
+};
+
+export const getDashboardSummary = async (
+  options?: RequestInit,
+): Promise<DashboardSummary> => {
+  return customFetch<DashboardSummary>(getGetDashboardSummaryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDashboardSummaryQueryKey = () => {
+  return [`/api/dashboard/summary`] as const;
+};
+
+export const getGetDashboardSummaryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDashboardSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDashboardSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetDashboardSummaryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDashboardSummary>>
+  > = ({ signal }) => getDashboardSummary({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDashboardSummary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDashboardSummaryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDashboardSummary>>
+>;
+export type GetDashboardSummaryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get dashboard summary statistics
+ */
+
+export function useGetDashboardSummary<
+  TData = Awaited<ReturnType<typeof getDashboardSummary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getDashboardSummary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDashboardSummaryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
