@@ -1,0 +1,520 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: TenantShield API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: cases
+    description: Tenant case operations
+  - name: letters
+    description: Generated demand letter operations
+  - name: dashboard
+    description: Dashboard summary operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /cases:
+    get:
+      operationId: listCases
+      tags: [cases]
+      summary: List all tenant cases
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, in_progress, resolved]
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [repairs, deposit, eviction, noise, harassment, other]
+      responses:
+        "200":
+          description: List of cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Case"
+
+    post:
+      operationId: createCase
+      tags: [cases]
+      summary: Create a new tenant case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCaseBody"
+      responses:
+        "201":
+          description: Case created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cases/recent:
+    get:
+      operationId: getRecentCases
+      tags: [cases]
+      summary: Get recently updated cases
+      responses:
+        "200":
+          description: Recent cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Case"
+
+  /cases/{id}:
+    get:
+      operationId: getCase
+      tags: [cases]
+      summary: Get a specific case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Case details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateCase
+      tags: [cases]
+      summary: Update a case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCaseBody"
+      responses:
+        "200":
+          description: Updated case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteCase
+      tags: [cases]
+      summary: Delete a case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cases/{id}/letters:
+    get:
+      operationId: listLettersByCase
+      tags: [letters]
+      summary: List letters for a specific case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Letters for the case
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Letter"
+
+    post:
+      operationId: generateLetter
+      tags: [letters]
+      summary: Generate a demand letter for a case
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateLetterBody"
+      responses:
+        "201":
+          description: Letter generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Letter"
+        "404":
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /letters:
+    get:
+      operationId: listLetters
+      tags: [letters]
+      summary: List all generated letters
+      responses:
+        "200":
+          description: All letters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Letter"
+
+  /letters/{id}:
+    get:
+      operationId: getLetter
+      tags: [letters]
+      summary: Get a specific letter
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Letter details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Letter"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteLetter
+      tags: [letters]
+      summary: Delete a letter
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Case:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        state:
+          type: string
+        status:
+          type: string
+          enum: [open, in_progress, resolved]
+        category:
+          type: string
+          enum: [repairs, deposit, eviction, noise, harassment, other]
+        landlordName:
+          type: ["string", "null"]
+        landlordEmail:
+          type: ["string", "null"]
+        landlordAddress:
+          type: ["string", "null"]
+        propertyAddress:
+          type: string
+        letterCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - description
+        - state
+        - status
+        - category
+        - landlordName
+        - landlordEmail
+        - landlordAddress
+        - propertyAddress
+        - letterCount
+        - createdAt
+        - updatedAt
+
+    CreateCaseBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        state:
+          type: string
+        category:
+          type: string
+          enum: [repairs, deposit, eviction, noise, harassment, other]
+        landlordName:
+          type: string
+        landlordEmail:
+          type: string
+        landlordAddress:
+          type: string
+        propertyAddress:
+          type: string
+      required:
+        - title
+        - description
+        - state
+        - category
+        - propertyAddress
+
+    UpdateCaseBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        state:
+          type: string
+        status:
+          type: string
+          enum: [open, in_progress, resolved]
+        category:
+          type: string
+          enum: [repairs, deposit, eviction, noise, harassment, other]
+        landlordName:
+          type: string
+        landlordEmail:
+          type: string
+        landlordAddress:
+          type: string
+        propertyAddress:
+          type: string
+
+    Letter:
+      type: object
+      properties:
+        id:
+          type: integer
+        caseId:
+          type: integer
+        content:
+          type: string
+        letterType:
+          type: string
+          enum: [demand, notice, complaint, appeal]
+        tone:
+          type: string
+          enum: [formal, firm, urgent]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - caseId
+        - content
+        - letterType
+        - tone
+        - createdAt
+
+    GenerateLetterBody:
+      type: object
+      properties:
+        letterType:
+          type: string
+          enum: [demand, notice, complaint, appeal]
+        tone:
+          type: string
+          enum: [formal, firm, urgent]
+        additionalContext:
+          type: string
+      required:
+        - letterType
+        - tone
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalCases:
+          type: integer
+        openCases:
+          type: integer
+        inProgressCases:
+          type: integer
+        resolvedCases:
+          type: integer
+        totalLetters:
+          type: integer
+        casesByCategory:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryCount"
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+      required:
+        - totalCases
+        - openCases
+        - inProgressCases
+        - resolvedCases
+        - totalLetters
+        - casesByCategory
+        - recentActivity
+
+    CategoryCount:
+      type: object
+      properties:
+        category:
+          type: string
+        count:
+          type: integer
+      required:
+        - category
+        - count
+
+    ActivityItem:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [case_created, case_updated, letter_generated]
+        description:
+          type: string
+        caseId:
+          type: integer
+        caseTitle:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - type
+        - description
+        - caseId
+        - caseTitle
+        - createdAt
+
